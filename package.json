@@ -1,0 +1,32 @@
+{
+  "name": "@reasoningco/ingress-cli",
+  "version": "0.2.2",
+  "description": "Ingress CLI and MCP stdio server for private beta users.",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reasoningco/ingress-cli.git"
+  },
+  "homepage": "https://github.com/reasoningco/ingress-cli#readme",
+  "bugs": {
+    "url": "https://github.com/reasoningco/ingress-cli/issues"
+  },
+  "bin": {
+    "ingress": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist/cli",
+    "dist/lib/ingress-version.js"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "pack:dry-run": "npm pack --dry-run",
+    "publish:beta": "npm publish --tag beta",
+    "prepublishOnly": "node -e \"const name=require('./package.json').name;if(name==='@npm-org/ingress'||name.includes('<'))throw new Error('Replace the placeholder npm scope in package.json before publishing.');\""
+  }
+}
