@@ -4,11 +4,20 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "package.json"
+      - "dist/**"
+      - "README.md"
+      - "LICENSE"
   workflow_dispatch:
 
 permissions:
   contents: write
   id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
