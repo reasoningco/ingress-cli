@@ -36,6 +36,6 @@ npm login
 npm publish --tag beta
 ```
 
-The package name is `@reasoningco/ingress-cli`, and `publishConfig.access` is `public`.
+The package name is `@reasoningco/ingress`, and `publishConfig.access` is `public`.
 
 Manual local publishing should only be used as a fallback when CI publishing is unavailable.

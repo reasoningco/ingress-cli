@@ -41,6 +41,8 @@ const node_path_1 = require("node:path");
 const ingress_version_1 = require("../lib/ingress-version");
 const CLI_VERSION = ingress_version_1.INGRESS_RELEASE_VERSION;
 const CLI_USER_AGENT = `ingress-forms-cli/${CLI_VERSION}`;
+const PRODUCTION_HOST = "https://ingresshq.com";
+const PLACEHOLDER_API_KEY = "ing_...";
 async function runCli(argv, deps = createNodeCliDeps()) {
     const ctx = createCliContext(deps);
     const parsed = parseArgs(argv);
@@ -169,7 +171,7 @@ async function runAuth(ctx, command, _args, flags, output) {
             const apiKey = stringFlag(flags, "api-key");
             if (!host || !apiKey) {
                 throw new UserError("auth login requires --host and --api-key", {
-                    hint: "Example: ingress auth login --host http://localhost:3000 --api-key ak_live_...",
+                    hint: `Example: ingress auth login --host ${PRODUCTION_HOST} --api-key ${PLACEHOLDER_API_KEY}`,
                 });
             }
             saveConfig(ctx, { host, apiKey });
@@ -267,7 +269,7 @@ async function runForms(ctx, command, args, flags, output) {
         case "commits": {
             const formId = requiredArg(args[0], "form id");
             const limit = limitFlag(flags, 200, 500);
-            const result = await apiRequest(ctx, "GET", queryPath(`/forms/${encodeURIComponent(formId)}/commits`, { ...flags, limit: String(limit) }, ["limit", "cursor"]));
+            const result = await apiRequest(ctx, "GET", queryPath(`/forms/${encodeURIComponent(formId)}/commits`, { ...flags, limit: String(limit) }, ["limit", "cursor", "branch"]));
             print(ctx, result, output);
             return;
         }
@@ -290,7 +292,7 @@ async function runForms(ctx, command, args, flags, output) {
         case "workflows": {
             const formId = requiredArg(args[0], "form id");
             const result = await apiRequest(ctx, "GET", queryPath(`/forms/${encodeURIComponent(formId)}/workflows`, flags, ["active"]));
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workspace-workflows": {
@@ -300,14 +302,14 @@ async function runForms(ctx, command, args, flags, output) {
                 "limit",
                 "cursor",
             ]));
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-get": {
             const formId = requiredArg(args[0], "form id");
             const workflowId = requiredArg(args[1], "workflow id");
             const result = await apiRequest(ctx, "GET", `/forms/${encodeURIComponent(formId)}/workflows/${encodeURIComponent(workflowId)}`);
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-create": {
@@ -316,7 +318,7 @@ async function runForms(ctx, command, args, flags, output) {
             if (!name)
                 throw new UserError("forms workflow-create requires --name <name>");
             const result = await apiRequest(ctx, "POST", `/forms/${encodeURIComponent(formId)}/workflows`, { name }, idempotencyOptions(flags));
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-plan": {
@@ -327,7 +329,7 @@ async function runForms(ctx, command, args, flags, output) {
                 throw new UserError("forms workflow-plan requires --ops <file>");
             const operations = readOperationsFile(ctx, opsPath);
             const result = await apiRequest(ctx, "POST", `/forms/${encodeURIComponent(formId)}/workflows/${encodeURIComponent(workflowId)}/plan`, { operations });
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-apply": {
@@ -339,14 +341,14 @@ async function runForms(ctx, command, args, flags, output) {
             const operations = readOperationsFile(ctx, opsPath);
             const dryRun = workflowApplyDryRun(flags);
             const result = await apiRequest(ctx, "POST", `/forms/${encodeURIComponent(formId)}/workflows/${encodeURIComponent(workflowId)}/apply`, { dryRun, operations }, idempotencyOptions(flags));
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-delete": {
             const formId = requiredArg(args[0], "form id");
             const workflowId = requiredArg(args[1], "workflow id");
             const result = await apiRequest(ctx, "DELETE", `/forms/${encodeURIComponent(formId)}/workflows/${encodeURIComponent(workflowId)}`, undefined, idempotencyOptions(flags));
-            print(ctx, result ?? { ok: true }, output);
+            print(ctx, normalizeWorkflowCliResult(result ?? { ok: true }), output);
             return;
         }
         case "workflow-reorder": {
@@ -356,7 +358,7 @@ async function runForms(ctx, command, args, flags, output) {
                 throw new UserError("forms workflow-reorder requires --workflow-ids <id,id>");
             }
             const result = await apiRequest(ctx, "PATCH", `/forms/${encodeURIComponent(formId)}/workflows/reorder`, { workflowIds }, idempotencyOptions(flags));
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-runs": {
@@ -364,20 +366,20 @@ async function runForms(ctx, command, args, flags, output) {
             const workflowId = requiredArg(args[1], "workflow id");
             const limit = limitFlag(flags, 50, 100);
             const result = await apiRequest(ctx, "GET", queryPath(`/forms/${encodeURIComponent(formId)}/workflows/${encodeURIComponent(workflowId)}/runs`, { ...flags, limit: String(limit) }, ["limit", "cursor", "status"]));
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-run": {
             const runId = requiredArg(args[0], "workflow run id");
             const result = await apiRequest(ctx, "GET", `/workflows/runs/${encodeURIComponent(runId)}`);
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-cases": {
             const workspaceId = requiredArg(args[0], "workspace id");
             const workflowId = requiredArg(args[1], "workflow id");
             const result = await apiRequest(ctx, "GET", queryPath(`/workspaces/${encodeURIComponent(workspaceId)}/workflows/${encodeURIComponent(workflowId)}/cases`, flags, ["limit", "cursor", "status"]));
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-case": {
@@ -385,13 +387,13 @@ async function runForms(ctx, command, args, flags, output) {
             const workflowId = requiredArg(args[1], "workflow id");
             const caseId = requiredArg(args[2], "workflow case id");
             const result = await apiRequest(ctx, "GET", `/workspaces/${encodeURIComponent(workspaceId)}/workflows/${encodeURIComponent(workflowId)}/cases/${encodeURIComponent(caseId)}`);
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "workflow-rerun": {
             const runId = requiredArg(args[0], "workflow run id");
             const result = await apiRequest(ctx, "POST", `/workflows/runs/${encodeURIComponent(runId)}/rerun`, {}, idempotencyOptions(flags));
-            print(ctx, result, output);
+            print(ctx, normalizeWorkflowCliResult(result), output);
             return;
         }
         case "plan": {
@@ -496,39 +498,6 @@ async function runForms(ctx, command, args, flags, output) {
             const result = await apiRequest(ctx, "POST", `/forms/${encodeURIComponent(formId)}/agent-drafts/${encodeURIComponent(branchId)}/abandon`, {
                 ...(reason ? { reason } : {}),
             }, idempotencyOptions(flags));
-            print(ctx, result, output);
-            return;
-        }
-        case "request-review": {
-            const formId = requiredArg(args[0], "form id");
-            const branchId = stringFlag(flags, "branch");
-            if (!branchId)
-                throw new UserError("forms request-review requires --branch <agent-branch-id>");
-            const title = stringFlag(flags, "title");
-            const description = stringFlag(flags, "description");
-            const result = await apiRequest(ctx, "POST", `/forms/${encodeURIComponent(formId)}/agent-drafts/${encodeURIComponent(branchId)}/review-request`, {
-                ...(title ? { title } : {}),
-                ...(description ? { description } : {}),
-            }, idempotencyOptions(flags));
-            print(ctx, result, output);
-            return;
-        }
-        case "review": {
-            const formId = requiredArg(args[0], "form id");
-            const branchId = stringFlag(flags, "branch");
-            const mergeRequestId = stringFlag(flags, "merge-request");
-            if (Boolean(branchId) === Boolean(mergeRequestId)) {
-                throw new UserError("forms review requires exactly one of --branch or --merge-request");
-            }
-            const strategy = stringFlag(flags, "strategy");
-            const query = new URLSearchParams();
-            if (branchId)
-                query.set("branchId", branchId);
-            if (mergeRequestId)
-                query.set("mergeRequestId", mergeRequestId);
-            if (strategy)
-                query.set("strategy", strategy);
-            const result = await apiRequest(ctx, "GET", `/forms/${encodeURIComponent(formId)}/agent-drafts/review?${query.toString()}`);
             print(ctx, result, output);
             return;
         }
@@ -668,7 +637,7 @@ function printMcpConfig(ctx, flags, output) {
         });
     }
     const config = loadConfig(ctx);
-    const host = config.host ?? "https://forms.example.com";
+    const host = config.host ?? PRODUCTION_HOST;
     const server = transport === "stdio"
         ? {
             command: "ingress",
@@ -677,7 +646,7 @@ function printMcpConfig(ctx, flags, output) {
         : {
             url: new URL("/api/mcp", normalizeHost(host)).toString(),
             headers: {
-                Authorization: `Bearer ${config.apiKey ?? "ak_live_..."}`,
+                Authorization: `Bearer ${config.apiKey ?? PLACEHOLDER_API_KEY}`,
             },
         };
     print(ctx, {
@@ -854,6 +823,54 @@ function printOrWriteJson(ctx, value, flags, output, label) {
     ctx.fs.writeFileSync(out, JSON.stringify(value, null, 2) + "\n");
     print(ctx, { ok: true, out }, output, `Wrote ${label} to ${out}`);
 }
+const CLI_FIELD_ALIASES = {
+    attempt_number: "attemptNumber",
+    case_id: "caseId",
+    closed_at: "closedAt",
+    created_at: "createdAt",
+    created_by_submission_id: "createdBySubmissionId",
+    decided_at: "decidedAt",
+    entry_form_id: "entryFormId",
+    finished_at: "finishedAt",
+    form_id: "formId",
+    is_active: "isActive",
+    node_id: "nodeId",
+    run_id: "runId",
+    started_at: "startedAt",
+    submission_id: "submissionId",
+    updated_at: "updatedAt",
+    workflow_id: "workflowId",
+    workflow_run_id: "workflowRunId",
+    workspace_id: "workspaceId",
+};
+const CLI_FIELD_NORMALIZER_SKIP_KEYS = new Set([
+    "config",
+    "data",
+    "definition",
+    "metadata",
+    "payload",
+    "plan",
+    "validation",
+]);
+function normalizeWorkflowCliResult(value) {
+    return normalizeCliFields(value);
+}
+function normalizeCliFields(value) {
+    if (Array.isArray(value))
+        return value.map((item) => normalizeCliFields(item));
+    if (!isRecord(value))
+        return value;
+    const normalized = {};
+    for (const [key, rawValue] of Object.entries(value)) {
+        const outputKey = CLI_FIELD_ALIASES[key] ?? key;
+        const outputValue = CLI_FIELD_NORMALIZER_SKIP_KEYS.has(outputKey)
+            ? rawValue
+            : normalizeCliFields(rawValue);
+        if (!(outputKey in normalized))
+            normalized[outputKey] = outputValue;
+    }
+    return normalized;
+}
 function writeLine(writer, text) {
     writer.write(`${text}\n`);
 }
@@ -861,7 +878,7 @@ function printGlobalHelp(ctx) {
     writeLine(ctx.stdout, `Ingress forms CLI
 
 Auth:
-  ingress auth login --host http://localhost:3000 --api-key ak_live_...
+  ingress auth login --host ${PRODUCTION_HOST} --api-key ${PLACEHOLDER_API_KEY}
   ingress auth status --json
   ingress auth logout
 
@@ -881,7 +898,7 @@ Forms:
   ingress forms agent-drafts list --form <form-id> --limit 100 --cursor <cursor> --json
   ingress forms agent-timeline --form <form-id> --limit 100 --cursor <cursor> --action agent_draft.apply --json
   ingress forms branches <form-id> --limit 100 --cursor <cursor> --json
-  ingress forms commits <form-id> --limit 200 --cursor <cursor> --json
+  ingress forms commits <form-id> --branch <branch-id> --limit 200 --cursor <cursor> --json
   ingress forms submissions <form-id> --limit 200 --cursor <cursor> --status new --json
   ingress forms submission-history <submission-id> --limit 100 --cursor <cursor> --json
   ingress forms workflows <form-id> --active true --json
@@ -908,8 +925,6 @@ Forms:
   ingress forms custom-js <form-id> --owner field --target email --script rule.js --watch plan --json
   ingress forms commit <form-id> --branch <branch-id> --message "Agent draft" --json
   ingress forms abandon-draft <form-id> --branch <branch-id> --reason "User rejected this direction" --json
-  ingress forms request-review <form-id> --branch <branch-id> --title "Ready for review" --json
-  ingress forms review <form-id> --merge-request <merge-request-id> --json
   ingress forms export <form-id> --branch <branch-id> --out schema.json
   ingress forms validate <form-id> --branch <branch-id> --json
 
@@ -968,7 +983,7 @@ Usage:
   ingress forms agent-drafts list --form <form-id> --limit 100 --cursor <cursor> --json
   ingress forms agent-timeline --form <form-id> --limit 100 --cursor <cursor> --action agent_draft.apply --json
   ingress forms branches <form-id> --limit 100 --cursor <cursor> --json
-  ingress forms commits <form-id> --limit 200 --cursor <cursor> --json
+  ingress forms commits <form-id> --branch <branch-id> --limit 200 --cursor <cursor> --json
   ingress forms submissions <form-id> --limit 200 --cursor <cursor> --status new --json
   ingress forms submission-history <submission-id> --limit 100 --cursor <cursor> --json
   ingress forms workflows <form-id> --active true --json
@@ -995,8 +1010,6 @@ Usage:
   ingress forms custom-js <form-id> --owner field --target email --script rule.js --watch plan --json
   ingress forms commit <form-id> --branch <branch-id> --message "Agent draft" --json
   ingress forms abandon-draft <form-id> --branch <branch-id> --reason "User rejected this direction" --json
-  ingress forms request-review <form-id> --branch <branch-id> --title "Ready for review" --json
-  ingress forms review <form-id> --merge-request <merge-request-id> --json
   ingress forms export <form-id> --branch <branch-id> --out schema.json
   ingress forms validate <form-id> --branch <branch-id> --json`);
 }
@@ -1050,18 +1063,20 @@ function loadConfig(ctx) {
 }
 function loadConfigInfo(ctx) {
     const fileConfig = readFileConfig(ctx);
+    const envHost = nonEmptyString(ctx.env.INGRESS_FORMS_HOST);
+    const envApiKey = nonEmptyString(ctx.env.INGRESS_FORMS_API_KEY);
     return {
         config: {
-            host: ctx.env.INGRESS_FORMS_HOST ?? fileConfig.host,
-            apiKey: ctx.env.INGRESS_FORMS_API_KEY ?? fileConfig.apiKey,
+            host: envHost ?? fileConfig.host,
+            apiKey: envApiKey ?? fileConfig.apiKey,
         },
         sources: {
-            host: ctx.env.INGRESS_FORMS_HOST
+            host: envHost
                 ? "INGRESS_FORMS_HOST"
                 : fileConfig.host
                     ? fileConfig.sourcePath
                     : undefined,
-            apiKey: ctx.env.INGRESS_FORMS_API_KEY
+            apiKey: envApiKey
                 ? "INGRESS_FORMS_API_KEY"
                 : fileConfig.apiKey
                     ? fileConfig.sourcePath
@@ -1090,7 +1105,7 @@ function saveConfig(ctx, config) {
     ctx.fs.writeFileSync(ctx.configPath, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
 }
 function clearConfig(ctx) {
-    for (const path of configCandidatePaths(ctx)) {
+    for (const path of configRemovalPaths(ctx)) {
         if (ctx.fs.existsSync(path))
             ctx.fs.rmSync(path);
     }
@@ -1099,14 +1114,14 @@ function configPath(ctx) {
     return ctx.configPath;
 }
 function readFileConfig(ctx) {
-    for (const path of configCandidatePaths(ctx)) {
+    for (const path of configReadCandidatePaths(ctx)) {
         if (!ctx.fs.existsSync(path))
             continue;
         try {
             const parsed = JSON.parse(ctx.fs.readFileSync(path, "utf8"));
             return {
-                host: typeof parsed.host === "string" ? parsed.host : undefined,
-                apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : undefined,
+                host: nonEmptyString(parsed.host),
+                apiKey: nonEmptyString(parsed.apiKey),
                 sourcePath: path,
             };
         }
@@ -1118,16 +1133,39 @@ function readFileConfig(ctx) {
 }
 function resolveConfigPath(env, homeDir) {
     if (env.INGRESS_CONFIG)
-        return (0, node_path_1.resolve)(env.INGRESS_CONFIG);
+        return env.INGRESS_CONFIG;
     if (env.XDG_CONFIG_HOME) {
         return (0, node_path_1.resolve)(env.XDG_CONFIG_HOME, "ingress", "config.json");
     }
     return (0, node_path_1.resolve)(homeDir, ".config", "ingress", "config.json");
 }
-function configCandidatePaths(ctx) {
+function configReadCandidatePaths(ctx) {
+    if (hasExplicitConfigPath(ctx))
+        return [ctx.configPath];
+    if (ctx.configPath === ctx.legacyConfigPath)
+        return [ctx.configPath];
+    if (hasEnvCredential(ctx))
+        return [ctx.configPath];
+    return [ctx.configPath, ctx.legacyConfigPath];
+}
+function configRemovalPaths(ctx) {
+    if (hasExplicitConfigPath(ctx))
+        return [ctx.configPath];
     if (ctx.configPath === ctx.legacyConfigPath)
         return [ctx.configPath];
     return [ctx.configPath, ctx.legacyConfigPath];
+}
+function hasExplicitConfigPath(ctx) {
+    return Boolean(ctx.env.INGRESS_CONFIG?.trim());
+}
+function hasEnvCredential(ctx) {
+    return Boolean(ctx.env.INGRESS_FORMS_HOST?.trim() || ctx.env.INGRESS_FORMS_API_KEY?.trim());
+}
+function nonEmptyString(value) {
+    if (typeof value !== "string")
+        return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
 }
 function redactSecret(value) {
     if (value.length <= 10)
@@ -1214,8 +1252,6 @@ async function runMcpSmoke(ctx, flags, output) {
         "ingress_plan_agent_draft",
         "ingress_apply_agent_draft",
         "ingress_abandon_agent_draft",
-        "ingress_request_agent_draft_review",
-        "ingress_review_agent_draft",
     ]) {
         if (!toolNames.includes(required)) {
             throw new UserError(`MCP tools/list did not include ${required}`);

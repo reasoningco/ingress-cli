@@ -1,23 +1,34 @@
-# Ingress CLI Private Beta
+# Ingress CLI
 
-The `ingress` command is the private beta CLI and MCP stdio server for Ingress forms.
+The `ingress` command is the Ingress forms CLI and MCP stdio server. The npm
+package is published as `@reasoningco/ingress`.
 
 ## Install
 
-Log in with an npm account that has access to the beta package through the npm org team:
+Install the current release from npm:
 
 ```bash
-npm login
-npm install -g @reasoningco/ingress-cli@beta
+npm install -g @reasoningco/ingress
 ingress version --json
 ```
 
 The package installs the `ingress` command.
 
+Maintainers should build and validate the package contents before publishing:
+
+```bash
+pnpm package:ingress
+cd packages/ingress
+npm publish
+```
+
+Do not publish, change package metadata, or create release tags unless the
+release plan has been approved.
+
 ## Authenticate
 
 ```bash
-ingress auth login --host <url> --api-key <key>
+ingress auth login --host https://ingresshq.com --api-key ing_...
 ingress doctor --json
 ```
 
@@ -56,4 +67,4 @@ The server process reads the authenticated local Ingress CLI config created by `
 
 ## Secret Handling
 
-Do not commit bearer tokens, API keys, local Ingress CLI config, or generated HTTP MCP configs. Prefer the stdio MCP config above for local agent clients. The HTTP config can include an `Authorization` bearer token when generated from an authenticated machine.
+Do not commit bearer tokens, API keys, local Ingress CLI config, or generated HTTP MCP configs. Prefer the stdio MCP config above for local agent clients. The HTTP config can include an `Authorization` bearer token when generated from an authenticated machine, so treat it as a secret-bearing file.

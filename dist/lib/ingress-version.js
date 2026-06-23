@@ -2,9 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.INGRESS_COMPATIBILITY = exports.INGRESS_MIN_CLI_VERSION = exports.INGRESS_MCP_TOOLS_VERSION = exports.INGRESS_API_VERSION = exports.INGRESS_RELEASE_VERSION = void 0;
 exports.getCliCompatibilityError = getCliCompatibilityError;
-exports.INGRESS_RELEASE_VERSION = "0.2.2";
+exports.INGRESS_RELEASE_VERSION = "0.2.3";
 exports.INGRESS_API_VERSION = "2026-05-26";
-exports.INGRESS_MCP_TOOLS_VERSION = "0.5";
+exports.INGRESS_MCP_TOOLS_VERSION = "0.7";
 exports.INGRESS_MIN_CLI_VERSION = "0.1.0";
 exports.INGRESS_COMPATIBILITY = {
     releaseVersion: exports.INGRESS_RELEASE_VERSION,
